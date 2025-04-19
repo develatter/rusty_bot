@@ -1,0 +1,32 @@
+[package]
+name = "rusty_bot_beta"
+version = "0.1.0"
+authors = ["Lattecast <rattack.hyde@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+dioxus = { version = "0.6.0", features = ["fullstack"] }
+kalosm = { git = "https://github.com/floneum/floneum", features = ["language", "metal"], rev = "c10046e", optional = true }
+tokio = "1.44.2"
+web-sys = "0.3.77"
+wasm-bindgen = "0.2.100"
+
+[features]
+default = []
+web = ["dioxus/web"]
+desktop = ["dioxus/desktop"]
+mobile = ["dioxus/mobile"]
+server = ["dioxus/server", "dep:kalosm"]
+metal = ["kalosm/metal"]
+
+[profile]
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+
+[profile.server-dev]
+inherits = "dev"
+
+[profile.android-dev]
+inherits = "dev"
