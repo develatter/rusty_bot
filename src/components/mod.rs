@@ -8,6 +8,3 @@ pub use hero::Hero;
 
 mod message;
 pub use message::Message;
-
-mod input;
-pub use input::Input;

@@ -1,1 +1,2 @@
-pub mod ws_server;
+#[cfg(feature = "server")]
+pub mod llm;
