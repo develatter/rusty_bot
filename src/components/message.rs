@@ -10,7 +10,7 @@ pub fn Message(msg: ReadOnlySignal<ChatMessage>) -> Element {
     let role = use_memo(move || msg().role.clone());
     let content = use_memo(move || msg().content.clone());
 
-    let message_class = "max-w-l  p-4 mb-5 self-start text-white";
+    let message_class = "max-w-md  p-4 mb-5 self-start text-white";
 
     rsx! {
         div {

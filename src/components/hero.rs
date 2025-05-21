@@ -27,17 +27,17 @@ pub fn Hero() -> Element {
             match init_model().await {
                 Ok(_) => {
                     is_model_loading.set(false);
-                    println!("Modelo inicializado correctamente");
+                    println!("Model succesfully initialized");
                 }
                 Err(e) => {
                     is_model_loading.set(false);
                     let mut history = message_history.read().clone();
                     history.push(ChatMessage {
                         role: ChatRole::Assistant,
-                        content: format!("Error al inicializar el modelo: {}", e),
+                        content: format!("Error initializing model: {}", e),
                     });
                     message_history.set(history);
-                    println!("Error al inicializar el modelo: {}", e);
+                    println!("Error initializing model: {}", e);
                 }
             }
         });
@@ -51,27 +51,6 @@ pub fn Hero() -> Element {
     });
 
     let mut send_message = move || {
-        if message_counter() >= 5 {
-            // Reiniciar la sesión si se han enviado 5 mensajes
-            spawn(async move {
-                match reset_session().await {
-                    Ok(_) => {
-                        message_counter.set(0);
-                        println!("Sesión reiniciada correctamente");
-                    }
-                    Err(e) => {
-                        let mut history = message_history.read().clone();
-                        history.push(ChatMessage {
-                            role: ChatRole::Assistant,
-                            content: format!("Error al reiniciar la sesión: {}", e),
-                        });
-                        message_history.set(history);
-                        println!("Error al reiniciar la sesión: {}", e);
-                    }
-                }
-            });
-        }
-
         let allowed_to_send = !is_model_answering() && !is_model_loading() && !message().is_empty();
         if allowed_to_send {
             is_model_answering.set(true);
@@ -227,15 +206,6 @@ async fn init_model() -> Result<(), ServerFnError> {
     })
 }
 
-#[server]
-pub async fn reset_session() -> Result<(), ServerFnError> {
-    use crate::server::llm::reset_chat_session;
-    // Reiniciar la sesión de chat
-    reset_chat_session().await.map_err(|e| {
-        ServerFnError::new(&format!("Error al reiniciar sesión: {}", e))
-    })
-}
-
 #[server(output = StreamingText)]
 pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
     use crate::server::llm;
@@ -253,45 +223,20 @@ pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
     println!("Procesando prompt: {}", prompt);
 
     // Primero intentamos obtener un stream sin reiniciar
-    let mut stream = match try_get_stream(&prompt) {
-        Ok(s) => s,
-        Err(_) => {
-            // Si falla, intentamos reiniciar la sesión
-            println!("No se pudo obtener un stream inicial, intentando reiniciar la sesión...");
-
-            // Reiniciar la sesión de chat
-            llm::reset_chat_session().await
-                .map_err(|e| ServerFnError::new(&format!("Error al reiniciar sesión: {}", e)))?;
-
-            // Intentar de nuevo después del reinicio
-            try_get_stream(&prompt)
-                .map_err(|_| ServerFnError::new("No se pudo obtener un stream después de reiniciar"))?
-        }
-    };
+    let mut stream = try_get_stream(&prompt).expect("Error getting stream");
 
     tokio::spawn(async move {
-        let mut token_count = 0;
-
-        // Enviar un token vacío inicial para asegurar que el stream no esté vacío
         let _ = tx.unbounded_send(Ok("".to_string()));
-
         // Consumir el stream y enviar los tokens al canal
         while let Some(token) = stream.next().await {
-            token_count += 1;
-            if token_count % 10 == 0 {
-                println!("Tokens enviados: {}", token_count);
-            }
-
-            // Reenviar el token
             if tx.unbounded_send(Ok(token)).is_err() {
                 println!("Error al enviar el token");
                 break;
             }
         }
-        println!("Stream completado, tokens totales: {}", token_count);
     });
 
-    println!("\nTiempo total: {:?}", time.elapsed());
+    println!("\nTotal response time: {:?}", time.elapsed());
     Ok(server_fn::codec::TextStream::new(rx))
 }
 
@@ -315,3 +260,5 @@ fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>, &'s
         .with_max_length(500)
     ))
 }
+
+
