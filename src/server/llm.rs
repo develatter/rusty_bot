@@ -9,13 +9,10 @@ pub static MODEL: OnceCell<Mutex<Llama>> = OnceCell::const_new();
 
 //Es más rápido con el prompt en inglés
 const SYSTEM_PROMT: &str = "You are a virtual assistant named Rusty. \
-If you don’t know something, do not make it up. \
 Be friendly and professional. \
-Speak English. \
 Use emojis when appropriate.";
 
 const MODEL_URL: &str = "models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf";
-const SECOND_MODEL_URL: &str = "models/Llama-3.2-3B-Instruct-Q8_0.gguf";
 pub async fn init_chat_model() -> Result<(), String> {
     use kalosm::language::{LlamaSource, ChatModelExt, FileSource};
 
@@ -24,9 +21,8 @@ pub async fn init_chat_model() -> Result<(), String> {
 
         let llama = Llama::builder()
             .with_source(
-                LlamaSource::new(
-                    FileSource::Local(PathBuf::from(MODEL_URL))
-                )
+                LlamaSource::qwen_2_5_7b_instruct()
+                //LlamaSource::new(FileSource::from(Local(PathBuf::from(MODEL_URL)))
             )
             .build()
             .await
@@ -43,3 +39,21 @@ pub async fn init_chat_model() -> Result<(), String> {
     Ok(())
 }
 
+pub fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>, &'static str> {
+    use crate::server::llm;
+    use kalosm::language::{GenerationParameters, ChatModelExt};
+
+    let chat_session = llm::CHAT_SESSION
+        .get()
+        .ok_or("Model couldn't be initialized.")?;
+
+    let mut guard = chat_session
+        .try_lock()
+        .map_err(|_| "Couldn't get model lock")?;
+
+    Ok(guard(prompt).with_sampler(GenerationParameters::default()
+        .with_temperature(0.7)
+        .with_top_p(0.9)
+        .with_max_length(500)
+    ))
+}

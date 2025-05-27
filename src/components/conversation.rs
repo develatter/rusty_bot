@@ -14,7 +14,7 @@ use crate::server;
 
 
 #[component]
-pub fn Hero() -> Element {
+pub fn Conversation() -> Element {
     let mut message = use_signal(|| String::new());
     let mut message_history = use_signal(|| Vec::<ChatMessage>::new());
     let mut is_model_answering = use_signal(|| false);
@@ -130,7 +130,7 @@ pub fn Hero() -> Element {
 
             div {
                 id: "chat-container",
-                class: "max-w-[52rem] w-full flex-grow overflow-y-auto flex flex-col gap-4 p-4 items-center",
+                class: "w-full flex-grow overflow-y-auto flex flex-col gap-4 p-4 items-center",
                 for m in message_history.read().iter() {
                     Message {
                         msg: m.clone(),
@@ -140,7 +140,7 @@ pub fn Hero() -> Element {
 
             div {
                 id: "input",
-                class: "max-w-[52rem] w-full flex gap-4 p-4 justify-center",
+                class: "w-full flex gap-4 p-4 justify-center",
 
                 textarea {
                     rows: "3",
@@ -199,7 +199,6 @@ pub fn scroll_to_bottom() -> () {
 #[server]
 async fn init_model() -> Result<(), ServerFnError> {
     use crate::server::llm::init_chat_model;
-
     // Inicializar el modelo
     init_chat_model().await.map_err(|e| {
         ServerFnError::new(&format!("Error al inicializar el modelo: {}", e))
@@ -222,8 +221,8 @@ pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
     let time = std::time::Instant::now();
     println!("Procesando prompt: {}", prompt);
 
-    // Primero intentamos obtener un stream sin reiniciar
-    let mut stream = try_get_stream(&prompt).expect("Error getting stream");
+    // Intentar obtener un stream sin reiniciar
+    let mut stream = llm::try_get_stream(&prompt).expect("Error getting stream");
 
     tokio::spawn(async move {
         let _ = tx.unbounded_send(Ok("".to_string()));
@@ -241,24 +240,6 @@ pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
 }
 
 
-#[cfg(feature = "server")]
-fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>, &'static str> {
-    use crate::server::llm;
-    use kalosm::language::{GenerationParameters, ChatModelExt};
 
-    let chat_session = llm::CHAT_SESSION
-        .get()
-        .ok_or("Model couldn't be initialized.")?;
-
-    let mut guard = chat_session
-        .try_lock()
-        .map_err(|_| "Couldn't get model lock")?;
-
-    Ok(guard(prompt).with_sampler(GenerationParameters::default()
-        .with_temperature(0.7)
-        .with_top_p(0.9)
-        .with_max_length(500)
-    ))
-}
 
 

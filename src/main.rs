@@ -2,7 +2,7 @@
 // need dioxus
 use dioxus::prelude::*;
 
-use components::{Hero};
+use components::{Conversation};
 
 /// Define a components module that contains all shared components for our app.
 mod components;
@@ -33,6 +33,6 @@ fn App() -> Element {
         // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-        Hero {}
+        Conversation {}
     }
 }

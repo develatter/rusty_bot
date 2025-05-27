@@ -1,4 +1,4 @@
-use comrak::{markdown_to_html_with_plugins, ExtensionOptions, Plugins, RenderOptions};
+use comrak::{markdown_to_html_with_plugins, ExtensionOptions, ExtensionOptionsBuilder, Plugins, RenderOptions, RenderPlugins};
 use comrak::plugins::syntect::SyntectAdapterBuilder;
 use crate::model::chat::{ChatMessage, ChatRole};
 use dioxus::prelude::*;
@@ -13,34 +13,39 @@ pub fn Message(msg: ReadOnlySignal<ChatMessage>) -> Element {
     let content = use_memo(move || {
         let msg = msg();
         let msg_content = &msg.content;
-
-        let mut plugins = Plugins::default();
-
-        let adapter = SyntectAdapterBuilder::new()
+        let syntec_adapter = SyntectAdapterBuilder::new()
             .theme("base16-ocean.dark")
             .build();
 
-        plugins.render.codefence_syntax_highlighter = Some(&adapter);
-        let mut extension = ExtensionOptions::default();
-        extension.strikethrough = true;
-        extension.tagfilter = true;
-        extension.table = true;
-        extension.autolink = true;
+        let plugins = Plugins::builder()
+            .render(
+                RenderPlugins::builder()
+                    .codefence_syntax_highlighter(&syntec_adapter)
+                    .build()
+            ).build();
 
-        let mut render = RenderOptions::default();
-        render.hardbreaks = true;
-        render.github_pre_lang = true;
+
+        let extension_options = ExtensionOptions::builder()
+            .strikethrough(true)
+            .tagfilter(true)
+            .autolink(true)
+            .table(true)
+            .build();
+
+        let render_options = RenderOptions::builder()
+            .hardbreaks(true)
+            .github_pre_lang(true)
+            .build();
 
         let options = comrak::Options {
-            extension,
-            render,
+            extension: extension_options,
+            render: render_options,
             ..Default::default()
         };
-
         markdown_to_html_with_plugins(msg_content, &options, &plugins)
     });
 
-    let message_class = "max-w-[36rem]  p-4 mb-5 self-start text-white overflow-x-auto white-space-pre-wrap break-words";
+    let message_class = "max-w-[70rem] p-4 mb-2 self-start text-white break-words";
 
     rsx! {
         div {
