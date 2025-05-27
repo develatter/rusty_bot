@@ -19,7 +19,6 @@ pub fn Hero() -> Element {
     let mut message_history = use_signal(|| Vec::<ChatMessage>::new());
     let mut is_model_answering = use_signal(|| false);
     let mut is_model_loading = use_signal(|| true);
-    let mut message_counter = use_signal(|| 0);
 
     // Inicializar el modelo al cargar el componente
     use_effect(move || {
@@ -91,7 +90,6 @@ pub fn Hero() -> Element {
                             // Actualizar la UI después de cada token
                             message_history.set(history.clone());
                         }
-                        message_counter.add(1);
                     }
                     Err(e) => {
                         // En caso de error, actualizar el mensaje con el error
@@ -132,7 +130,7 @@ pub fn Hero() -> Element {
 
             div {
                 id: "chat-container",
-                class: "max-w-3xl w-full flex-grow overflow-y-auto flex flex-col gap-4 p-4 items-center",
+                class: "max-w-[52rem] w-full flex-grow overflow-y-auto flex flex-col gap-4 p-4 items-center",
                 for m in message_history.read().iter() {
                     Message {
                         msg: m.clone(),
@@ -142,9 +140,11 @@ pub fn Hero() -> Element {
 
             div {
                 id: "input",
-                class: "max-w-3xl w-full flex gap-4 p-4 justify-center",
-                input {
-                    class: "border-2 border-gray-300 rounded-lg p-2 w-full text-black",
+                class: "max-w-[52rem] w-full flex gap-4 p-4 justify-center",
+
+                textarea {
+                    rows: "3",
+                    class: "border-2 border-gray-300 rounded-lg p-2 w-full text-black h-[72px] overflow-y-auto resize-none",
                     placeholder: {
                         if is_model_loading() { "Esperando al modelo..." }
                         else if is_model_answering() { "" }
@@ -170,7 +170,7 @@ pub fn Hero() -> Element {
                 }
                 button {
                     class: format!(
-                        "bg-blue-500 text-white rounded-lg p-2 {}",
+                        "bg-blue-500 text-white rounded-lg h-[72px] flex items-center justify-center px-4 {}",
                         if is_model_answering() || is_model_loading() || message().is_empty() {
                             "opacity-50 cursor-not-allowed"
                         } else { "" }
@@ -210,13 +210,13 @@ async fn init_model() -> Result<(), ServerFnError> {
 pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
     use crate::server::llm;
     use futures;
-    use kalosm::language::{GenerationParameters, ChatModelExt, StreamExt, TextStream};
+    use kalosm::language::{ChatModelExt, StreamExt, TextStream};
 
     let (tx, rx) = futures::channel::mpsc::unbounded();
 
     // Verificar si el modelo está inicializado
     if llm::CHAT_SESSION.get().is_none() {
-        return Err(ServerFnError::new("Modelo no inicializado"));
+        return Err(ServerFnError::new("Model not ininitalized"));
     }
 
     let time = std::time::Instant::now();

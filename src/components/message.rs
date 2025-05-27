@@ -1,3 +1,5 @@
+use comrak::{markdown_to_html_with_plugins, ExtensionOptions, Plugins, RenderOptions};
+use comrak::plugins::syntect::SyntectAdapterBuilder;
 use crate::model::chat::{ChatMessage, ChatRole};
 use dioxus::prelude::*;
 
@@ -8,9 +10,37 @@ pub fn Message(msg: ReadOnlySignal<ChatMessage>) -> Element {
         message.role == ChatRole::Assistant && message.content.is_empty()
     });
     let role = use_memo(move || msg().role.clone());
-    let content = use_memo(move || msg().content.clone());
+    let content = use_memo(move || {
+        let msg = msg();
+        let msg_content = &msg.content;
 
-    let message_class = "max-w-md  p-4 mb-5 self-start text-white";
+        let mut plugins = Plugins::default();
+
+        let adapter = SyntectAdapterBuilder::new()
+            .theme("base16-ocean.dark")
+            .build();
+
+        plugins.render.codefence_syntax_highlighter = Some(&adapter);
+        let mut extension = ExtensionOptions::default();
+        extension.strikethrough = true;
+        extension.tagfilter = true;
+        extension.table = true;
+        extension.autolink = true;
+
+        let mut render = RenderOptions::default();
+        render.hardbreaks = true;
+        render.github_pre_lang = true;
+
+        let options = comrak::Options {
+            extension,
+            render,
+            ..Default::default()
+        };
+
+        markdown_to_html_with_plugins(msg_content, &options, &plugins)
+    });
+
+    let message_class = "max-w-[36rem]  p-4 mb-5 self-start text-white overflow-x-auto white-space-pre-wrap break-words";
 
     rsx! {
         div {
