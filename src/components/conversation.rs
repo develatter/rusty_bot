@@ -19,6 +19,7 @@ pub fn Conversation() -> Element {
     let mut message_history = use_signal(|| Vec::<ChatMessage>::new());
     let mut is_model_answering = use_signal(|| false);
     let mut is_model_loading = use_signal(|| true);
+    let mut cancel_token = use_signal(|| false);
 
     // Inicializar el modelo al cargar el componente
     use_effect(move || {
@@ -49,52 +50,32 @@ pub fn Conversation() -> Element {
         }
     });
 
-    let mut send_message = move || {
-        let allowed_to_send = !is_model_answering() && !is_model_loading() && !message().is_empty();
-        if allowed_to_send {
+    let mut button_action = move || {
+        if is_model_answering() {
+            // Solicita cancelar
+            cancel_token.set(true);
+            is_model_answering.set(false);
+        } else if !is_model_loading() && !message().is_empty() {
+            cancel_token.set(false);
             is_model_answering.set(true);
-            // Guarda el mensaje actual antes de limpiarlo
             let user_message = message().clone();
-
-            // Actualiza el historial de mensajes
             let mut history = message_history().clone();
-            history.push(ChatMessage {
-                role: ChatRole::User,
-                content: user_message.clone(),
-            });
-
-            // Añadir mensaje vacío para el asistente desde el principio
-            history.push(ChatMessage {
-                role: ChatRole::Assistant,
-                content: "".to_string(),
-            });
-
+            history.push(ChatMessage { role: ChatRole::User, content: user_message.clone() });
+            history.push(ChatMessage { role: ChatRole::Assistant, content: String::new() });
             message_history.set(history.clone());
-            message.set("".to_string());
+            message.set(String::new());
 
-            // Captura lo necesario para el spawn
-            let mut message_history = message_history.clone();
+            let mut history = history.clone();
             let mut is_model_answering = is_model_answering.clone();
-
+            let cancel_token = cancel_token.clone();
             spawn(async move {
-                let mut history = message_history().clone();
-
-                match get_response(user_message).await {
-                    Ok(response) => {
-                        let mut stream = response.into_inner();
-                        while let Some(Ok(chunk)) = stream.next().await {
-                            // Actualizar el último mensaje incrementalmente
-                            let last_index = history.len() - 1;
-                            history[last_index].content.push_str(&chunk);
-
-                            // Actualizar la UI después de cada token
-                            message_history.set(history.clone());
+                if let Ok(mut stream) = get_response(user_message).await.map(|r| r.into_inner()) {
+                    while let Some(Ok(chunk)) = stream.next().await {
+                        if cancel_token() {
+                            break;
                         }
-                    }
-                    Err(e) => {
-                        // En caso de error, actualizar el mensaje con el error
-                        let last_index = history.len() - 1;
-                        history[last_index].content = format!("Error: {}", e);
+                        let last = history.len() - 1;
+                        history[last].content.push_str(&chunk);
                         message_history.set(history.clone());
                     }
                 }
@@ -164,22 +145,41 @@ pub fn Conversation() -> Element {
                         && !is_model_answering()
                         && !message().is_empty() {
                             event.prevent_default();
-                            send_message();
+                            button_action();
                         }
                     }
                 }
                 button {
                     class: format!(
                         "bg-blue-500 text-white rounded-lg h-[72px] flex items-center justify-center px-4 {}",
-                        if is_model_answering() || is_model_loading() || message().is_empty() {
+                        if is_model_loading() || ( !is_model_answering() && message().is_empty() ) {
                             "opacity-50 cursor-not-allowed"
                         } else { "" }
                     ),
-                    disabled: is_model_answering() || is_model_loading() || message().is_empty(),
+                    disabled: is_model_loading() || ( !is_model_answering() && message().is_empty() ),
                     onclick: move |_| {
-                        send_message();
+                        button_action();
                     },
-                    "Enviar"
+                    if is_model_answering() { "Cancelar" } else { "Enviar" }
+                }
+                
+                
+                button {
+                    class: format! (
+                        "fixed top-4 left-4 bg-blue-500 hover:bg-blue-600 text-white rounded-full \
+                        w-12 h-12 flex items-center justify-center shadow-lg {}",
+                        if is_model_loading() || is_model_answering() {
+                            "opacity-50 cursor-not-allowed"
+                        } else { "" }
+                    ),
+                    disabled: is_model_loading() || is_model_answering(),
+                    onclick:  move |_| {
+                        spawn(async move {
+                            reset_chat().await.unwrap();
+                            message_history.set(Vec::new());
+                        });
+                    },
+                    "🔄"
                 }
             }
         }
@@ -199,10 +199,16 @@ pub fn scroll_to_bottom() -> () {
 #[server]
 async fn init_model() -> Result<(), ServerFnError> {
     use crate::server::llm::init_chat_model;
-    // Inicializar el modelo
     init_chat_model().await.map_err(|e| {
         ServerFnError::new(&format!("Error al inicializar el modelo: {}", e))
     })
+}
+
+
+#[server]
+async fn reset_chat() -> Result<(), ServerFnError> {
+    use crate::server::llm::reset_chat;
+    reset_chat().map_err(|e| ServerFnError::new(&format!("Error trying to reset chat: {}", e)))
 }
 
 #[server(output = StreamingText)]

@@ -40,10 +40,9 @@ pub async fn init_chat_model() -> Result<(), String> {
 }
 
 pub fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>, &'static str> {
-    use crate::server::llm;
     use kalosm::language::{GenerationParameters, ChatModelExt};
 
-    let chat_session = llm::CHAT_SESSION
+    let chat_session = CHAT_SESSION
         .get()
         .ok_or("Model couldn't be initialized.")?;
 
@@ -56,4 +55,19 @@ pub fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>,
         .with_top_p(0.9)
         .with_max_length(500)
     ))
+}
+pub fn reset_chat() -> Result<(), String> {
+    let llama = MODEL
+        .get()
+        .ok_or("Model not initialized")?
+        .lock()
+        .map_err(|_| "Error locking model")?;
+    let new_chat = llama.chat().with_system_prompt(SYSTEM_PROMT);
+    let session_mutex = CHAT_SESSION
+        .get()
+        .ok_or("Session not initialized")?;
+    *session_mutex
+        .lock()
+        .map_err(|_| "Error locking session")? = new_chat;
+    Ok(())
 }
