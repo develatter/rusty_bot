@@ -1,7 +1,6 @@
 // The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
 // need dioxus
 use dioxus::prelude::*;
-
 use components::{Conversation};
 
 /// Define a components module that contains all shared components for our app.
@@ -36,3 +35,4 @@ fn App() -> Element {
         Conversation {}
     }
 }
+

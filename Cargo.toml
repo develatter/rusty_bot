@@ -5,20 +5,23 @@ authors = ["Lattecast <rattack.hyde@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-dioxus = { version = "0.6.0", features = ["fullstack"] }
-kalosm = { git = "https://github.com/floneum/floneum", features = ["language"], rev = "c10046e", optional = true }
-tokio = "1.44.2"
+dioxus = { version = "0.6.3", features = ["fullstack"] }
+kalosm = { git = "https://github.com/floneum/floneum", features = ["language", "surrealdb"], optional = true }
+tokio = "1.45.1"
 web-sys = "0.3.77"
 wasm-bindgen = "0.2.100"
 futures = "0.3.31"
 comrak = "0.39.0"
+surrealdb = { version = "2.3.3", features = ["kv-surrealkv", "kv-mem"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
+
 
 [features]
 default = []
 web = ["dioxus/web"]
 desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
-server = ["dioxus/server", "dep:kalosm"]
+server = ["dioxus/server", "dep:kalosm", "dep:surrealdb"]
 
 [profile]
 

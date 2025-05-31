@@ -9,9 +9,8 @@ use dioxus::CapturedError;
 use futures::{StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use dioxus::prelude::server_fn::ServerFn;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-use crate::server;
-
 
 #[component]
 pub fn Conversation() -> Element {
@@ -24,7 +23,7 @@ pub fn Conversation() -> Element {
     // Inicializar el modelo al cargar el componente
     use_effect(move || {
         spawn(async move {
-            match init_model().await {
+            match init_llm_model().await {
                 Ok(_) => {
                     is_model_loading.set(false);
                     println!("Model succesfully initialized");
@@ -41,7 +40,23 @@ pub fn Conversation() -> Element {
                 }
             }
         });
+
+        spawn(async move {
+            println!("Initializing database...");
+            // Initialize the database connection and document table
+            if let Err(e) = init_db().await {
+                println!("Error initializing database: {}", e);
+            }
+        });
+
+        spawn(async move {
+            match init_embedding_model().await {
+                Ok(_) => println!("Embedding model succesfully initialized"),
+                Err(e) => println!("Error initializing embedding model: {}", e),
+            }
+        });
     });
+
 
     // Scroll al fondo cuando cambie el historial de mensajes
     use_effect(move || {
@@ -52,23 +67,32 @@ pub fn Conversation() -> Element {
 
     let mut button_action = move || {
         if is_model_answering() {
-            // Solicita cancelar
+            // Cancelar
             cancel_token.set(true);
             is_model_answering.set(false);
         } else if !is_model_loading() && !message().is_empty() {
             cancel_token.set(false);
             is_model_answering.set(true);
-            let user_message = message().clone();
+
+            let mut user_message = message().clone();
             let mut history = message_history().clone();
+
             history.push(ChatMessage { role: ChatRole::User, content: user_message.clone() });
             history.push(ChatMessage { role: ChatRole::Assistant, content: String::new() });
+
             message_history.set(history.clone());
             message.set(String::new());
 
             let mut history = history.clone();
             let mut is_model_answering = is_model_answering.clone();
             let cancel_token = cancel_token.clone();
+
             spawn(async move {
+                if let Ok(context) = search_context(user_message.clone()).await {
+                    let context_string = format!("\n\n[Possible useful context:\n{}]", context);
+                    user_message.push_str(&context_string);
+                }
+
                 if let Ok(mut stream) = get_response(user_message).await.map(|r| r.into_inner()) {
                     while let Some(Ok(chunk)) = stream.next().await {
                         if cancel_token() {
@@ -162,8 +186,8 @@ pub fn Conversation() -> Element {
                     },
                     if is_model_answering() { "Cancelar" } else { "Enviar" }
                 }
-                
-                
+
+
                 button {
                     class: format! (
                         "fixed top-4 left-4 bg-blue-500 hover:bg-blue-600 text-white rounded-full \
@@ -197,11 +221,31 @@ pub fn scroll_to_bottom() -> () {
 }
 
 #[server]
-async fn init_model() -> Result<(), ServerFnError> {
+async fn init_llm_model() -> Result<(), ServerFnError> {
     use crate::server::llm::init_chat_model;
     init_chat_model().await.map_err(|e| {
         ServerFnError::new(&format!("Error al inicializar el modelo: {}", e))
     })
+}
+
+#[server]
+async fn init_embedding_model() -> Result<(), ServerFnError> {
+    use crate::server::embedding::init_embedding_model;
+    init_embedding_model().await.map_err(|e| {
+        ServerFnError::new(&format!("Error al inicializar el modelo de embedding: {}", e))
+    })
+}
+
+
+#[server]
+pub async fn get_embedding(txt: String) -> Result<Vec<f32>, ServerFnError> {
+    let result = tokio::task::spawn_blocking(move || {
+        futures::executor::block_on(crate::server::embedding::embed_text(&txt))
+    })
+        .await
+        .map_err(|e| ServerFnError::new(&e.to_string()))?;
+
+    result.map_err(|e| ServerFnError::new(&format!("Error embedding text: {}", e)))
 }
 
 
@@ -246,6 +290,31 @@ pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
 }
 
 
+#[server]
+async fn search_context(q: String) -> Result<String, ServerFnError> {
+    println!("Searching context for query: {}", q);
+    let context = crate::server::database_impl::query(&q).await.map_err(|e| {
+        println!("Error querying database: {}", e);
+        ServerFnError::new(&format!("Error querying database: {}", e))
+    })?.into_iter()
+        .map(|document| {
+            format!(
+                "Title: {}\nBody: {}\n",
+                document.title,
+                document.body
+            )
+        }).collect::<Vec<_>>().join("\n");
+    Ok(context)
+}
 
 
-
+#[server]
+async fn init_db() -> Result<(), ServerFnError> {
+    crate::server::database_impl::connect_to_database()
+        .await
+        .map_err(|e| {
+            eprintln!("Error: {:?}", e);
+            ServerFnError::new(e)
+        })?;
+    Ok(())
+}
