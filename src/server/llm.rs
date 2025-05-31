@@ -8,9 +8,7 @@ pub static CHAT_SESSION: OnceCell<Mutex<Chat<Llama>>> = OnceCell::const_new();
 pub static MODEL: OnceCell<Mutex<Llama>> = OnceCell::const_new();
 
 //Es más rápido con el prompt en inglés
-const SYSTEM_PROMT: &str = "You are a virtual assistant answering user questions\
-Be friendly and professional. \
-Use emojis when appropriate.";
+const SYSTEM_PROMT: &str = "use the provided context only if relevant to the user question";
 
 pub async fn init_chat_model() -> Result<(), String> {
     use kalosm::language::{LlamaSource, ChatModelExt, FileSource};
@@ -21,7 +19,6 @@ pub async fn init_chat_model() -> Result<(), String> {
         let llama = Llama::builder()
             .with_source(
                 LlamaSource::qwen_2_5_7b_instruct()
-                //LlamaSource::new(FileSource::from(Local(PathBuf::from(MODEL_URL)))
             )
             .build()
             .await
@@ -29,7 +26,7 @@ pub async fn init_chat_model() -> Result<(), String> {
 
 
         println!("Model loaded successfully");
-        let chat = llama.chat().with_system_prompt(SYSTEM_PROMT);
+        let chat = llama.chat();
         MODEL.set(Mutex::new(llama))
             .map_err(|_| "Couldn't set model".to_string())?;
         CHAT_SESSION.set(Mutex::new(chat))
@@ -55,13 +52,13 @@ pub fn try_get_stream(prompt: &str) -> Result<impl futures::Stream<Item=String>,
         .with_max_length(600)
     ))
 }
-pub fn reset_chat() -> Result<(), String> {
+pub async fn reset_chat() -> Result<(), String> {
     let llama = MODEL
         .get()
         .ok_or("Model not initialized")?
         .lock()
         .map_err(|_| "Error locking model")?;
-    let new_chat = llama.chat().with_system_prompt(SYSTEM_PROMT);
+    let new_chat = llama.chat();
     let session_mutex = CHAT_SESSION
         .get()
         .ok_or("Session not initialized")?;

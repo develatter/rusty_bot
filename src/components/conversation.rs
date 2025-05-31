@@ -1,16 +1,10 @@
-use std::ops::Add;
 use crate::components::Message;
 use crate::model::chat::{ChatMessage, ChatRole};
 use dioxus::html::input_data::keyboard_types::Key;
-use dioxus::logger::tracing::instrument::WithSubscriber;
-use dioxus::prelude::server_fn::codec::{StreamingText, TextStream};
 use dioxus::prelude::*;
-use dioxus::CapturedError;
-use futures::{StreamExt, TryFutureExt};
-use std::path::PathBuf;
-use dioxus::prelude::server_fn::ServerFn;
-use serde::{Deserialize, Serialize};
+use futures::{StreamExt};
 use wasm_bindgen::prelude::*;
+use crate::server_functions::server_functions::{get_response, reset_chat, search_context, init_llm_model, init_embedding_model, init_db};
 
 #[component]
 pub fn Conversation() -> Element {
@@ -111,7 +105,7 @@ pub fn Conversation() -> Element {
     rsx! {
         div {
             id: "hero",
-            class: "w-full bg-[#0f1116] mx-auto h-screen flex flex-col items-center",
+            class: "w-full max-w-[80rem] bg-[#0f1116] mx-auto h-screen flex flex-col items-center",
 
             if is_model_loading() {
                 div {
@@ -203,7 +197,20 @@ pub fn Conversation() -> Element {
                             message_history.set(Vec::new());
                         });
                     },
-                    "🔄"
+                    svg {
+                        xmlns: "http://www.w3.org/2000/svg",
+                        fill: "none",
+                        view_box: "0 0 24 24",
+                        stroke_width: "1.5",
+                        stroke: "currentColor",
+                        class: "size-6",
+
+                        path {
+                            stroke_linecap: "round",
+                            stroke_linejoin: "round",
+                            d: "M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                        }
+                    }
                 }
             }
         }
@@ -218,103 +225,4 @@ pub fn scroll_to_bottom() -> () {
         let div = element.dyn_into::<web_sys::HtmlElement>().unwrap();
         div.set_scroll_top(div.scroll_height());
     }
-}
-
-#[server]
-async fn init_llm_model() -> Result<(), ServerFnError> {
-    use crate::server::llm::init_chat_model;
-    init_chat_model().await.map_err(|e| {
-        ServerFnError::new(&format!("Error al inicializar el modelo: {}", e))
-    })
-}
-
-#[server]
-async fn init_embedding_model() -> Result<(), ServerFnError> {
-    use crate::server::embedding::init_embedding_model;
-    init_embedding_model().await.map_err(|e| {
-        ServerFnError::new(&format!("Error al inicializar el modelo de embedding: {}", e))
-    })
-}
-
-
-#[server]
-pub async fn get_embedding(txt: String) -> Result<Vec<f32>, ServerFnError> {
-    let result = tokio::task::spawn_blocking(move || {
-        futures::executor::block_on(crate::server::embedding::embed_text(&txt))
-    })
-        .await
-        .map_err(|e| ServerFnError::new(&e.to_string()))?;
-
-    result.map_err(|e| ServerFnError::new(&format!("Error embedding text: {}", e)))
-}
-
-
-#[server]
-async fn reset_chat() -> Result<(), ServerFnError> {
-    use crate::server::llm::reset_chat;
-    reset_chat().map_err(|e| ServerFnError::new(&format!("Error trying to reset chat: {}", e)))
-}
-
-#[server(output = StreamingText)]
-pub async fn get_response(prompt: String) -> Result<TextStream, ServerFnError> {
-    use crate::server::llm;
-    use futures;
-    use kalosm::language::{ChatModelExt, StreamExt, TextStream};
-
-    let (tx, rx) = futures::channel::mpsc::unbounded();
-
-    // Verificar si el modelo está inicializado
-    if llm::CHAT_SESSION.get().is_none() {
-        return Err(ServerFnError::new("Model not ininitalized"));
-    }
-
-    let time = std::time::Instant::now();
-    println!("Procesando prompt: {}", prompt);
-
-    // Intentar obtener un stream sin reiniciar
-    let mut stream = llm::try_get_stream(&prompt).expect("Error getting stream");
-
-    tokio::spawn(async move {
-        let _ = tx.unbounded_send(Ok("".to_string()));
-        // Consumir el stream y enviar los tokens al canal
-        while let Some(token) = stream.next().await {
-            if tx.unbounded_send(Ok(token)).is_err() {
-                println!("Error al enviar el token");
-                break;
-            }
-        }
-    });
-
-    println!("\nTotal response time: {:?}", time.elapsed());
-    Ok(server_fn::codec::TextStream::new(rx))
-}
-
-
-#[server]
-async fn search_context(q: String) -> Result<String, ServerFnError> {
-    println!("Searching context for query: {}", q);
-    let context = crate::server::database_impl::query(&q).await.map_err(|e| {
-        println!("Error querying database: {}", e);
-        ServerFnError::new(&format!("Error querying database: {}", e))
-    })?.into_iter()
-        .map(|document| {
-            format!(
-                "Title: {}\nBody: {}\n",
-                document.title,
-                document.body
-            )
-        }).collect::<Vec<_>>().join("\n");
-    Ok(context)
-}
-
-
-#[server]
-async fn init_db() -> Result<(), ServerFnError> {
-    crate::server::database_impl::connect_to_database()
-        .await
-        .map_err(|e| {
-            eprintln!("Error: {:?}", e);
-            ServerFnError::new(e)
-        })?;
-    Ok(())
 }

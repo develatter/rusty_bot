@@ -45,15 +45,17 @@ pub fn Message(msg: ReadOnlySignal<ChatMessage>) -> Element {
         markdown_to_html_with_plugins(msg_content, &options, &plugins)
     });
 
-    let message_class = "max-w-[70rem] p-4 mb-2 self-start text-white break-words";
+    let message_class = "max-w-[70rem] p-4 mb-2 break-words";
+    let user_message_class = "self-end bg-blue-500 rounded-tl-lg rounded-tr-lg rounded-bl-lg text-white";
+    let assistant_message_class = "self-start max-w-full text-gray-200";
 
     rsx! {
         div {
             class: "{message_class}",
             class: if role() == ChatRole::Assistant {
-                "self-start bg-gray-500 rounded-tl-lg rounded-tr-lg rounded-br-lg"
+                "{assistant_message_class}"
             } else {
-                "self-end bg-blue-500 rounded-tl-lg rounded-tr-lg rounded-bl-lg"
+                "{user_message_class}"
             },
 
             class: if assistant_placeholder() {

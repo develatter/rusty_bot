@@ -7,6 +7,7 @@ use components::{Conversation};
 mod components;
 mod model;
 mod server;
+mod server_functions;
 
 // We can import assets in dioxus with the `asset!` macro. This macro takes a path to an asset relative to the crate root.
 // The macro returns an `Asset` type that will display as the path to the asset in the browser or a local path in desktop bundles.
@@ -32,7 +33,10 @@ fn App() -> Element {
         // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.
         document::Link { rel: "icon", href: FAVICON }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-        Conversation {}
+        body {
+            class: "bg-[#0f1116]",
+            Conversation {}
+        }
     }
 }
 
