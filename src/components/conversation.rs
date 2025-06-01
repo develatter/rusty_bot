@@ -13,6 +13,7 @@ pub fn Conversation() -> Element {
     let mut is_model_answering = use_signal(|| false);
     let mut is_model_loading = use_signal(|| true);
     let mut cancel_token = use_signal(|| false);
+    let mut use_context = use_signal(|| false);
 
     // Inicializar el modelo al cargar el componente
     use_effect(move || {
@@ -81,10 +82,13 @@ pub fn Conversation() -> Element {
             let mut is_model_answering = is_model_answering.clone();
             let cancel_token = cancel_token.clone();
 
+            let use_context_val = use_context();
             spawn(async move {
-                if let Ok(context) = search_context(user_message.clone()).await {
-                    let context_string = format!("\n\n[Possible useful context:\n{}]", context);
-                    user_message.push_str(&context_string);
+                if use_context_val {
+                    if let Ok(context) = search_context(user_message.clone()).await {
+                        let context_string = format!("\n\n[Possible useful context:\n{}]", context);
+                        user_message.push_str(&context_string);
+                    }
                 }
 
                 if let Ok(mut stream) = get_response(user_message).await.map(|r| r.into_inner()) {
@@ -139,7 +143,7 @@ pub fn Conversation() -> Element {
 
             div {
                 id: "input",
-                class: "w-full flex gap-4 p-4 justify-center",
+                class: "w-full flex gap-4 p-4 justify-center items-end relative",
 
                 textarea {
                     rows: "3",
@@ -167,6 +171,39 @@ pub fn Conversation() -> Element {
                         }
                     }
                 }
+                label {
+                    class: format!(
+                        "absolute left-5 bottom-5 inline-flex items-center cursor-pointer opacity-70{}",
+                        if is_model_loading() || is_model_answering() { "" } else { " hover:opacity-100" }
+                    ),
+                    input {
+                        disabled: is_model_loading() || is_model_answering(),
+                        r#type: "checkbox",
+                        class: "sr-only peer",
+                        checked: "{use_context}",
+                        onchange: move |e| use_context.set(e.value().parse::<bool>().unwrap_or(false)),
+                    }
+                    div {
+                        class: "\
+                            peer ring-2 ring-gray-900 \
+                            bg-gray-300 \
+                            rounded-full outline-none duration-300 after:duration-500 \
+                            w-7 h-3  peer-checked:bg-blue-500 \
+                            peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gray-900 \
+                            relative \
+                            after:content-[''] after:rounded-full after:absolute after:outline-none \
+                            after:h-4 after:w-4 after:bg-gray-50 after:-top-0.5 after:-left-0.5 \
+                            after:flex after:justify-center after:items-center after:border after:border-gray-900 \
+                            peer-checked:after:translate-x-4 \
+                            transition-all",
+                    }
+                    span {
+                        class: "ml-1 text-[10px] text-gray-400 bg-transparent px-1 py-0 rounded select-none pointer-events-none",
+                        "Contexto"
+                    }
+                }
+
+
                 button {
                     class: format!(
                         "bg-blue-500 text-white rounded-lg h-[72px] flex items-center justify-center px-4 {}",
@@ -212,6 +249,8 @@ pub fn Conversation() -> Element {
                         }
                     }
                 }
+
+
             }
         }
     }
