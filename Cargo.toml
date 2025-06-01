@@ -1,8 +1,9 @@
 [package]
-name = "rusty_bot_beta"
+name = "rusty_bot"
 version = "0.1.0"
-authors = ["Lattecast <rattack.hyde@gmail.com>"]
 edition = "2021"
+license = "GPL-3.0-or-later"
+authors = ["Alejandro López Martínez lattecast@gmail.com"]
 
 [dependencies]
 dioxus = { version = "0.6.3", features = ["fullstack"] }
@@ -40,3 +41,5 @@ rustflags = ["-C", "target-cpu=native"]
 
 [target.x86_64-apple-darwin]
 rustflags = ["-C", "target-feature=-avx,-avx2"]
+
+

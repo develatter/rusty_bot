@@ -1,39 +1,32 @@
-# Development
+# Rusty Bot Beta
 
-Your new jumpstart project includes basic organization with an organized `assets` folder and a `components` folder. 
-If you chose to develop with the router feature, you will also have a `views` folder.
+## Getting Started
 
-```
-project/
-├─ assets/ # Any assets that are used by the app should be placed here
-├─ src/
-│  ├─ main.rs # The entrypoint for the app.
-│  ├─ components/
-│  │  ├─ mod.rs # Defines the components module
-│  │  ├─ hero.rs # The Hero component for use in the home page
-│  │  ├─ echo.rs # The echo component uses server functions to communicate with the server
-├─ Cargo.toml # The Cargo.toml file defines the dependencies and feature flags for your project
-```
+This guide will help you get the Rusty Bot Beta application up and running on your local machine.
 
-### Tailwind
-1. Install npm: https://docs.npmjs.com/downloading-and-installing-node-js-and-npm
-2. Install the Tailwind CSS CLI: https://tailwindcss.com/docs/installation
-3. Run the following command in the root of the project to start the Tailwind CSS compiler:
+## Prerequisites
 
-```bash
-npx tailwindcss -i ./input.css -o ./assets/tailwind.css --watch
-```
+Before you begin, ensure you have the following installed:
 
-### Serving Your App
+1.  **Rust**: If you don't have Rust installed, you can install it by running the following command in your terminal:
+    ```bash
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    ```
+    Follow the on-screen instructions to complete the installation. 
 
-Run the following command in the root of your project to start developing with the default platform:
+2.  **Dioxus CLI**: Once Rust and Cargo are set up, install the Dioxus CLI by running:
+    ```bash
+    cargo install dioxus-cli
+    ```
+
+## Running the Application
+
+To run the application in development mode with web support, navigate to the project directory and execute the following command:
 
 ```bash
-dx serve --platform web
+dx serve --platform web --release
 ```
 
-To run for a different platform, use the `--platform platform` flag. E.g.
-```bash
-dx serve --platform desktop
-```
+This will build and serve your Dioxus application, typically making it accessible via `http://localhost:8080` in your web browser.
+
 

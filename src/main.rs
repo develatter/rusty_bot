@@ -1,4 +1,4 @@
-//! # Rusty Bot Beta
+//! # Rusty Bot
 //! 
 //! Main entry point for the Rusty Bot application.
 //! This app uses Dioxus as a framework to create a reactive web user interface
