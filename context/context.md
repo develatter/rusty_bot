@@ -1,4 +1,5 @@
 [Contexto del proyecto]
+
 Rusty bot es un proyecto de código abierto.
 El propósito de Rusty Bot es proporcionar una interfaz de comunicación entre un modelo de lenguaje entrenado y un
 usuario.
