@@ -8,11 +8,10 @@
 
 *A modern AI chatbot built entirely in Rust with RAG capabilities*
 
-[Features](#features) •
-[Architecture](#architecture) •
-[Installation](#installation) •
-[Usage](#usage) •
-[Development](#development)
+[Features](#-features) •
+[Installation](#-installation) •
+[Usage](#-usage) •
+[Development](#-development)
 
 </div>
 
